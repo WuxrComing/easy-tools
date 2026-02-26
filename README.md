@@ -1,35 +1,33 @@
-﻿# PDF 转长图工具（PyQt6）
+﻿# Easy Tools - HTML + Python Backend Version
+
+本分支提供 `HTML + FastAPI` 实现版本。
+
+## 技术栈
+- Frontend: HTML / CSS / Vanilla JS
+- Backend: FastAPI + PyMuPDF + Pillow
 
 ## 功能
-- 苹果风格图形界面（圆角、浅色、主按钮高亮）
-- 图形界面选择 PDF
-- 右侧实时 PDF 预览（上一页 / 下一页 / 页码跳转 / 缩放）
-- 自定义输出路径
-- 可设置渲染 DPI（72-600）
-- 支持导出 PNG / JPG
-- 将 PDF 各页按顺序纵向拼接成一张长图
+- 工具集合侧栏（可收缩，进入工具后自动收缩）
+- PDF 预览（上一页/下一页/跳页）
+- 预览模式：适应宽度 / 适应页面 / 百分比
+- 页码范围导出：`9-11`、`1,3,9-11`
+- 导出 PNG/JPG 并直接浏览器下载
 
-## 环境
-- Python 3.10+
-
-## 安装依赖
+## 安装
 ```bash
-pip install -r requirements.txt
+pip install -r requirements_web.txt
 ```
 
 ## 运行
 ```bash
-python main.py
+uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-## 使用说明
-1. 点击“选择 PDF”加载文件并自动显示预览。
-2. 在右侧预览区翻页或调整缩放。
-3. 点击“保存为”选择输出图片路径。
-4. 选择 DPI 和图片格式。
-5. 点击“开始转换”。
+浏览器打开：
+- http://127.0.0.1:8000
 
-## 说明
-- 页宽不一致时会自动居中补白。
-- DPI 越高，清晰度越高，耗时和内存占用也越高。
-- 预览缩放仅影响界面显示，不影响导出清晰度。
+## 目录
+- `backend/app.py` FastAPI 接口与 PDF 处理逻辑
+- `web/index.html` 前端结构
+- `web/styles.css` 前端样式
+- `web/app.js` 前端交互逻辑
