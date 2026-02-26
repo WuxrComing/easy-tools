@@ -1,5 +1,7 @@
 ﻿import os
 import re
+import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 
@@ -290,6 +292,7 @@ class PdfLongImagePage(QWidget):
         self.preview_doc: fitz.Document | None = None
         self.current_page_index = 0
         self.last_output_path = ""
+        self.external_open_supported = self._detect_external_open_support()
 
         self.pdf_path_edit = QLineEdit()
         self.output_path_edit = QLineEdit()
@@ -397,6 +400,9 @@ class PdfLongImagePage(QWidget):
         self.convert_btn.clicked.connect(self.start_convert)
         self.open_file_btn.setEnabled(False)
         self.open_dir_btn.setEnabled(False)
+        if not self.external_open_supported:
+            self.open_file_btn.setToolTip("当前系统未检测到可用的文件打开命令")
+            self.open_dir_btn.setToolTip("当前系统未检测到可用的目录打开命令")
         self.open_file_btn.clicked.connect(self.open_output_file)
         self.open_dir_btn.clicked.connect(self.open_output_dir)
 
@@ -663,8 +669,8 @@ class PdfLongImagePage(QWidget):
         self.progress_hint.setVisible(False)
 
         self.last_output_path = output_path
-        self.open_file_btn.setEnabled(True)
-        self.open_dir_btn.setEnabled(True)
+        self.open_file_btn.setEnabled(self.external_open_supported)
+        self.open_dir_btn.setEnabled(self.external_open_supported)
         QMessageBox.information(self, "完成", f"转换成功:\n{output_path}")
 
     @pyqtSlot(str)
@@ -676,8 +682,9 @@ class PdfLongImagePage(QWidget):
 
     @pyqtSlot()
     def open_output_file(self) -> None:
-        if self.last_output_path and os.path.isfile(self.last_output_path):
-            os.startfile(self.last_output_path)  # type: ignore[attr-defined]
+        if not self.last_output_path or not os.path.isfile(self.last_output_path):
+            return
+        self._open_path(self.last_output_path)
 
     @pyqtSlot()
     def open_output_dir(self) -> None:
@@ -685,7 +692,30 @@ class PdfLongImagePage(QWidget):
             return
         folder = os.path.dirname(os.path.abspath(self.last_output_path))
         if os.path.isdir(folder):
-            os.startfile(folder)  # type: ignore[attr-defined]
+            self._open_path(folder)
+
+    @staticmethod
+    def _detect_external_open_support() -> bool:
+        if sys.platform == "win32":
+            return hasattr(os, "startfile")
+        if sys.platform == "darwin":
+            return shutil.which("open") is not None
+        if sys.platform.startswith("linux"):
+            return shutil.which("xdg-open") is not None
+        return False
+
+    def _open_path(self, path: str) -> None:
+        try:
+            if sys.platform == "win32":
+                os.startfile(path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.run(["open", path], check=False)
+            elif sys.platform.startswith("linux"):
+                subprocess.run(["xdg-open", path], check=False)
+            else:
+                QMessageBox.warning(self, "提示", "当前系统暂不支持自动打开路径。")
+        except Exception as e:
+            QMessageBox.warning(self, "提示", f"打开失败：{e}")
 
 
 class MainWindow(QMainWindow):
@@ -847,3 +877,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
