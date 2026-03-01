@@ -35,6 +35,7 @@ from PyQt6.QtCore import (
     QObject,
     QParallelAnimationGroup,
     QPropertyAnimation,
+    QSize,
     QThread,
     Qt,
     pyqtSignal,
@@ -882,10 +883,26 @@ class MainWindow(QMainWindow):
 
 
 def _pdf_tool_icon() -> QIcon:
-    """从 assets/ 目录加载 PDF 工具图标，若不存在则降级为标准图标。"""
-    asset = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "pdf_tool.png")
-    if os.path.isfile(asset):
-        return QIcon(asset)
+    """从 assets/ 目录加载 PDF 工具图标，优先使用平台最合适的资源。"""
+    assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+    ico_asset = os.path.join(assets_dir, "pdf_tool.ico")
+
+    if sys.platform == "win32" and os.path.isfile(ico_asset):
+        return QIcon(ico_asset)
+
+    icon = QIcon()
+    for px in (16, 24, 32, 48, 64, 128, 256):
+        sized_png = os.path.join(assets_dir, f"pdf_tool_{px}.png")
+        if os.path.isfile(sized_png):
+            icon.addFile(sized_png, QSize(px, px))
+
+    if not icon.isNull():
+        return icon
+
+    fallback_png = os.path.join(assets_dir, "pdf_tool.png")
+    if os.path.isfile(fallback_png):
+        return QIcon(fallback_png)
+
     from PyQt6.QtWidgets import QApplication, QStyle
     return QApplication.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon)
 
@@ -1023,4 +1040,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

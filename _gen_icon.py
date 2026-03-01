@@ -2,9 +2,8 @@
 生成 PDF 转长图工具的图标。
 运行后在 assets/ 目录生成 pdf_tool.ico (Windows) 和 pdf_tool.png (各尺寸)。
 """
-import math
 import os
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw
 
 SIZES = [16, 32, 48, 64, 128, 256]
 OUT_DIR = os.path.join(os.path.dirname(__file__), "assets")
@@ -73,21 +72,8 @@ def render(size: int) -> Image.Image:
                 fill=(210, 75, 50, 220))
 
     # ── 箭头（中间） ──────────────────────────────────────────
-    ax_center = round(s * 0.50)
     ay_center = round(s * 0.50)
-    aw = round(s * 0.11)            # 箭头宽度
-    ah = round(s * 0.14)            # 箭头总长
-    ah_head = round(s * 0.07)       # 箭头头部高度
-    aw_head = round(s * 0.14)       # 箭头头部宽度
-
-    # 箭头杆
-    d.rectangle([ax_center - aw // 2, ay_center - ah // 2,
-                 ax_center + aw // 2, ay_center + ah // 2 - ah_head],
-                fill=(255, 255, 255, 230))
-    # 箭头头部（向右，旋转后变向下 → 我们画向右的箭头）
-    # 重新布局：水平箭头 →
-    # 重置为水平方向
-    # 杆：从 left_x 到 right_x，居中
+    # 水平箭头：从文档指向预览区域
     arr_l = round(s * 0.455)
     arr_r = round(s * 0.545)
     arr_cy = ay_center
