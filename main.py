@@ -21,6 +21,13 @@ if sys.platform == "win32":
                 pass
             os.environ["PATH"] = qt_bin + os.pathsep + os.environ.get("PATH", "")
             break
+elif sys.platform == "darwin":
+    if "QT_QPA_PLATFORM_PLUGIN_PATH" not in os.environ:
+        for path_item in sys.path:
+            qt_platforms = os.path.join(path_item, "PyQt6", "Qt6", "plugins", "platforms")
+            if os.path.isdir(qt_platforms):
+                os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_platforms
+                break
 
 from PyQt6.QtCore import (
     QEasingCurve,
@@ -33,7 +40,7 @@ from PyQt6.QtCore import (
     pyqtSignal,
     pyqtSlot,
 )
-from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtGui import QIcon, QImage, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
@@ -326,6 +333,11 @@ class PdfLongImagePage(QWidget):
         self.dpi_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.page_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
 
+        # 根据平台调整控件高度：Mac 上原生控件更高，用 Fusion 后统一用像素值
+        # Fusion 样式下不同平台字体行高不同，用平台分支保持视觉一致
+        row_h = 32 if sys.platform == "darwin" else 30
+        btn_h = 30 if sys.platform == "darwin" else 28
+
         for w in (
             self.pdf_path_edit,
             self.output_path_edit,
@@ -336,10 +348,10 @@ class PdfLongImagePage(QWidget):
             self.zoom_combo,
             self.convert_btn,
         ):
-            w.setFixedHeight(34)
+            w.setFixedHeight(row_h)
 
-        self.open_file_btn.setFixedHeight(32)
-        self.open_dir_btn.setFixedHeight(32)
+        self.open_file_btn.setFixedHeight(btn_h)
+        self.open_dir_btn.setFixedHeight(btn_h)
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
@@ -722,6 +734,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Easy Tools")
+        self.setWindowIcon(_pdf_tool_icon())
         self.resize(1320, 860)
 
         self.nav_collapsed = False
@@ -755,7 +768,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(10)
         style = self.style()
         home_icon = style.standardIcon(QStyle.StandardPixmap.SP_DesktopIcon)
-        pdf_icon = style.standardIcon(QStyle.StandardPixmap.SP_FileIcon)
+        pdf_icon = _pdf_tool_icon()
         future_icon = style.standardIcon(QStyle.StandardPixmap.SP_DirIcon)
 
         self.nav_panel.setFrameShape(QFrame.Shape.StyledPanel)
@@ -868,8 +881,141 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 
+def _pdf_tool_icon() -> QIcon:
+    """从 assets/ 目录加载 PDF 工具图标，若不存在则降级为标准图标。"""
+    asset = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "pdf_tool.png")
+    if os.path.isfile(asset):
+        return QIcon(asset)
+    from PyQt6.QtWidgets import QApplication, QStyle
+    return QApplication.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon)
+
+
+def _hex(color) -> str:  # type: ignore[no-untyped-def]
+    """QPalette QColor → CSS #rrggbb 字符串。"""
+    return "#{:02x}{:02x}{:02x}".format(color.red(), color.green(), color.blue())
+
+
+def _lighter(color, factor: int = 120):  # type: ignore[no-untyped-def]
+    from PyQt6.QtGui import QColor
+    return QColor(color).lighter(factor)
+
+
+def _darker(color, factor: int = 120):  # type: ignore[no-untyped-def]
+    from PyQt6.QtGui import QColor
+    return QColor(color).darker(factor)
+
+
+def _configure_app(app: QApplication) -> None:
+    """统一跨平台显示风格，自动适配深色/浅色模式。"""
+    from PyQt6.QtGui import QFont, QPalette
+
+    # 使用 Fusion 样式：Qt 内置跨平台风格，在 Win/Mac/Linux 表现一致
+    app.setStyle("Fusion")
+
+    # 设置平台对应的系统字体，保证中文显示正常
+    if sys.platform == "darwin":
+        font = QFont("-apple-system", 13)
+    elif sys.platform == "win32":
+        font = QFont("Microsoft YaHei UI", 9)
+    else:
+        font = QFont("Noto Sans CJK SC", 10)
+    app.setFont(font)
+
+    # 从调色板读取实际颜色，自动兼容深色/浅色模式
+    pal = app.palette()
+    is_dark = pal.color(QPalette.ColorRole.Window).lightness() < 128
+
+    # --- 基础色 ---
+    btn      = pal.color(QPalette.ColorRole.Button)
+    btn_text = pal.color(QPalette.ColorRole.ButtonText)
+    base     = pal.color(QPalette.ColorRole.Base)
+    text     = pal.color(QPalette.ColorRole.Text)
+    mid      = pal.color(QPalette.ColorRole.Mid)
+
+    # 按钮渐变：顶部略亮，底部略暗
+    btn_top    = _hex(_lighter(btn, 108))
+    btn_bot    = _hex(_darker(btn, 108))
+    btn_border = _hex(_darker(btn, 140) if not is_dark else _lighter(btn, 80))
+
+    # 悬停：蓝色语调，叠加在按钮色上
+    hover_top  = _hex(_lighter(btn, 115))
+    hover_bot  = _hex(btn)
+    hover_brd  = "#4a90d9"
+
+    # 按下：比按钮色深一档
+    press_top  = _hex(_darker(btn, 108))
+    press_bot  = _hex(_darker(btn, 120))
+
+    # 禁用
+    dis_bg     = _hex(_lighter(btn, 103) if not is_dark else _darker(btn, 110))
+    dis_text   = _hex(pal.color(QPalette.ColorRole.PlaceholderText))
+    dis_border = _hex(mid)
+
+    # 输入框
+    input_bg   = _hex(base)
+    input_text = _hex(text)
+    input_brd  = _hex(_darker(base, 150) if not is_dark else _lighter(base, 160))
+
+    app.setStyleSheet(f"""
+        QGroupBox {{
+            font-weight: 600;
+            margin-top: 8px;
+            padding-top: 6px;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            left: 8px;
+            top: 0px;
+        }}
+        QLineEdit, QSpinBox, QComboBox {{
+            padding: 2px 6px;
+            border: 1px solid {input_brd};
+            border-radius: 4px;
+            background: {input_bg};
+            color: {input_text};
+        }}
+        QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
+            border-color: #4a90d9;
+        }}
+        QPushButton {{
+            padding: 4px 14px;
+            border: 1px solid {btn_border};
+            border-radius: 4px;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                        stop:0 {btn_top}, stop:1 {btn_bot});
+            color: {_hex(btn_text)};
+        }}
+        QPushButton:hover {{
+            border-color: {hover_brd};
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                        stop:0 {hover_top}, stop:1 {hover_bot});
+        }}
+        QPushButton:pressed {{
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                        stop:0 {press_top}, stop:1 {press_bot});
+            border-color: #3a7ac9;
+        }}
+        QPushButton:disabled {{
+            background: {dis_bg};
+            border-color: {dis_border};
+            color: {dis_text};
+        }}
+        QProgressBar {{
+            border: 1px solid {input_brd};
+            border-radius: 4px;
+            text-align: center;
+        }}
+        QProgressBar::chunk {{
+            border-radius: 4px;
+            background-color: #4a90d9;
+        }}
+        QScrollArea {{ border: none; }}
+    """)
+
+
 def main() -> None:
     app = QApplication(sys.argv)
+    _configure_app(app)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
